@@ -6,58 +6,87 @@ interface WeatherForecastProps {
 }
 
 const WeatherForecast = ({ forecast }: WeatherForecastProps) => {
-  if (forecast.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-500">No forecast data available. Select a location to view forecast.</p>
-      </div>
-    );
-  }
+  if (!forecast.length) return null;
+
+  const weekDays = [
+    { label: 'Dom', index: 0 },
+    { label: 'Seg', index: 1 },
+    { label: 'Ter', index: 2 },
+    { label: 'Qua', index: 3 },
+    { label: 'Qui', index: 4 },
+    { label: 'Sex', index: 5 },
+    { label: 'Sáb', index: 6 }
+  ];
+
+  const normalizeDate = (dateStr: string) =>
+    new Date(`${dateStr}T12:00:00`);
+
+  const todayMonthDay = new Date().toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short'
+  });
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-4">
-      {forecast.map((day) => {
-        const date = new Date(day.date);
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-        const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      {weekDays.map(({ label, index }) => {
+        const forecastDay = forecast.find(day => {
+          const date = normalizeDate(day.date);
+          return date.getDay() === index;
+        });
+
+        if (!forecastDay) return null;
+
+        const date = normalizeDate(forecastDay.date);
+
+        const monthDay = date.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'short'
+        });
+
+        const isToday = monthDay === todayMonthDay;
 
         return (
           <div
-            key={day.date}
-            className="bg-white dark:bg-gray-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border border-gray-100 dark:border-gray-600"
+            key={forecastDay.date}
+            className="bg-white dark:bg-gray-700 rounded-xl p-4 shadow-sm border"
           >
             <div className="text-center">
-              <p className="font-semibold text-gray-900 dark:text-white">{dayName}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{monthDay}</p>
+              <p className="font-semibold">
+                {isToday ? 'Hoje' : label}
+              </p>
+
+              <p className="text-xs text-gray-500 mb-3">
+                {monthDay}
+              </p>
 
               <img
-                src={`https:${day.day.condition.icon}`}
-                alt={day.day.condition.text}
+                src={`https:${forecastDay.day.condition.icon}`}
+                alt={forecastDay.day.condition.text}
                 className="w-12 h-12 mx-auto mb-2"
               />
 
-              <p className="text-xs text-gray-600 dark:text-gray-300 mb-3 min-h-[2.5rem] line-clamp-2">
-                {day.day.condition.text}
+              <p className="text-xs mb-3 line-clamp-2">
+                {forecastDay.day.condition.text}
               </p>
 
               <div className="flex justify-center gap-2 mb-3">
-                <span className="text-lg font-bold text-gray-900 dark:text-white">
-                  {Math.round(day.day.maxtemp_c)}°
+                <span className="font-bold">
+                  {Math.round(forecastDay.day.maxtemp_c)}°
                 </span>
-                <span className="text-lg text-gray-400 dark:text-gray-300">
-                  {Math.round(day.day.mintemp_c)}°
+                <span className="text-gray-400">
+                  {Math.round(forecastDay.day.mintemp_c)}°
                 </span>
               </div>
 
               <div className="space-y-1 text-xs">
-                <div className="flex items-center justify-center gap-1 text-blue-600 dark:text-blue-400">
+                <div className="flex justify-center gap-1 text-blue-600">
                   <CloudRain className="w-3 h-3" />
-                  <span>{day.day.daily_chance_of_rain}%</span>
+                  <span>{forecastDay.day.daily_chance_of_rain}%</span>
                 </div>
 
-                <div className="flex items-center justify-center gap-1 text-gray-600 dark:text-gray-300">
+                <div className="flex justify-center gap-1">
                   <Droplets className="w-3 h-3" />
-                  <span>{day.day.avghumidity}%</span>
+                  <span>{forecastDay.day.avghumidity}%</span>
                 </div>
               </div>
             </div>

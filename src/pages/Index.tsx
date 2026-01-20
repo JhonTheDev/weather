@@ -5,7 +5,7 @@ import CurrentWeather from "@/components/weather/CurrentWeather";
 import HistoricalChart from "@/components/weather/HistoricalChart";
 import LocationSearch from "@/components/weather/LocationSearch";
 import WeatherForecast from "@/components/weather/WeatherForecast";
-import { WeatherData, ForecastDay } from "@/types/weather";
+import { ForecastDay } from "@/types/weather";
 import {
   fetchCurrentWeather,
   fetchForecast,
@@ -22,20 +22,17 @@ const OPENWEATHER_KEY = import.meta.env.VITE_WEATHERAPI_KEY as string;
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string;
 
 const Index = () => {
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const { toast } = useToast();
-  const [apiKeys] = useState({openWeather: OPENWEATHER_KEY, mapbox: MAPBOX_TOKEN,});
+  const [apiKeys] = useState({ openWeather: OPENWEATHER_KEY, mapbox: MAPBOX_TOKEN });
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [currentWeather, setCurrentWeather] = useState<CurrentWeatherData | null>(null);
-  const [forecast, setForecast] = useState<ForecastItem[]>([]);
+  const [sevenDayForecast, setSevenDayForecast] = useState<ForecastDay[]>([]);
   const [historical, setHistorical] = useState<HistoricalItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [sevenDayForecast, setSevenDayForecast] = useState<ForecastDay[]>([]);
 
-  // Função para converter dados da OpenWeather para a estrutura do WeatherForecast
+  // Função para converter dados da OpenWeather para estrutura de 7 dias
   const convertToForecastDay = (forecastItems: ForecastItem[]): ForecastDay[] => {
-    // Agrupar por dia
     const dailyForecast: { [key: string]: ForecastItem[] } = {};
     
     forecastItems.forEach(item => {
@@ -48,59 +45,63 @@ const Index = () => {
       dailyForecast[dateKey].push(item);
     });
     
-    // Converter para ForecastDay[]
-    return Object.entries(dailyForecast).map(([date, items]) => {
-      const temps = items.map(item => item.temp);
-      const maxTemp = Math.max(...temps);
-      const minTemp = Math.min(...temps);
-      const avgTemp = temps.reduce((a, b) => a + b) / temps.length;
-      
-      // Pegar a condição do meio do dia (índice 4 = meio-dia)
-      const middayCondition = items[Math.min(4, items.length - 1)];
-      
-      return {
-        date,
-        date_epoch: new Date(date).getTime() / 1000,
-        day: {
-          maxtemp_c: maxTemp,
-          mintemp_c: minTemp,
-          avgtemp_c: avgTemp,
-          maxtemp_f: (maxTemp * 9/5) + 32,
-          mintemp_f: (minTemp * 9/5) + 32,
-          avgtemp_f: (avgTemp * 9/5) + 32,
-          condition: {
-            text: middayCondition?.description || "Clear",
-            icon: getWeatherIcon(middayCondition?.description || "Clear"),
+    // Converter para ForecastDay[] e ordenar por data
+    return Object.entries(dailyForecast)
+      .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime())
+      .map(([date, items]) => {
+        const temps = items.map(item => item.temp);
+        const maxTemp = Math.max(...temps);
+        const minTemp = Math.min(...temps);
+        const avgTemp = temps.reduce((a, b) => a + b) / temps.length;
+        
+        // Pegar a condição do meio do dia
+        const middayCondition = items[Math.min(4, items.length - 1)];
+        
+        return {
+          date,
+          date_epoch: new Date(date).getTime() / 1000,
+          day: {
+            maxtemp_c: maxTemp,
+            mintemp_c: minTemp,
+            avgtemp_c: avgTemp,
+            maxtemp_f: (maxTemp * 9/5) + 32,
+            mintemp_f: (minTemp * 9/5) + 32,
+            avgtemp_f: (avgTemp * 9/5) + 32,
+            condition: {
+              text: middayCondition?.description || "Clear",
+              icon: getWeatherIcon(middayCondition?.description || "Clear"),
+            },
+            maxwind_kph: 0,
+            totalprecip_mm: items.reduce((sum, item) => sum + (item.precipitation || 0), 0),
+            avghumidity: Math.round(items.reduce((sum, item) => sum + item.humidity, 0) / items.length),
+            daily_chance_of_rain: Math.round(Math.random() * 100),
+            daily_chance_of_snow: 0,
+            uv: 5,
           },
-          maxwind_kph: 0,
-          totalprecip_mm: items.reduce((sum, item) => sum + (item.precipitation || 0), 0),
-          avghumidity: Math.round(items.reduce((sum, item) => sum + item.humidity, 0) / items.length),
-          daily_chance_of_rain: Math.round(Math.random() * 100),
-          daily_chance_of_snow: 0,
-          uv: 5,
-        },
-        hour: items.map(item => ({
-          time: item.date.split(' ')[1],
-          temp_c: item.temp,
-          condition: {
-            text: item.description,
-            icon: getWeatherIcon(item.description),
-          },
-          wind_kph: 0,
-          humidity: item.humidity,
-          chance_of_rain: 0,
-        }))
-      };
-    }).slice(0, 7);
+          hour: items.map(item => ({
+            time: item.date.split(' ')[1] || '00:00',
+            temp_c: item.temp,
+            condition: {
+              text: item.description,
+              icon: getWeatherIcon(item.description),
+            },
+            wind_kph: 0,
+            humidity: item.humidity,
+            chance_of_rain: 0,
+          }))
+        };
+      })
+      .slice(0, 7);
   };
 
   // Função auxiliar para obter ícone baseado na descrição
   const getWeatherIcon = (description: string): string => {
     const desc = description.toLowerCase();
     if (desc.includes('snow')) return '//cdn.weatherapi.com/weather/64x64/day/338.png';
-    if (desc.includes('rain')) return '//cdn.weatherapi.com/weather/64x64/day/266.png';
+    if (desc.includes('rain') || desc.includes('drizzle')) return '//cdn.weatherapi.com/weather/64x64/day/266.png';
     if (desc.includes('cloud')) return '//cdn.weatherapi.com/weather/64x64/day/116.png';
-    return '//cdn.weatherapi.com/weather/64x64/day/113.png';
+    if (desc.includes('clear')) return '//cdn.weatherapi.com/weather/64x64/day/113.png';
+    return '//cdn.weatherapi.com/weather/64x64/day/116.png';
   };
 
   const toggleTheme = () => {
@@ -110,7 +111,7 @@ const Index = () => {
 
   const fetchWeatherData = useCallback(
     async (lat: number, lng: number) => {
-      if (!apiKeys) return;
+      if (!apiKeys.openWeather) return;
 
       setLoading(true);
       try {
@@ -120,17 +121,15 @@ const Index = () => {
         ]);
 
         setCurrentWeather(weather);
-        setForecast(forecastData);
         setHistorical(generateHistoricalData(lat));
         setLocation({ lat, lng });
         
-        // Converter para o formato de 7 dias
         const sevenDayData = convertToForecastDay(forecastData);
         setSevenDayForecast(sevenDayData);
       } catch (error) {
         toast({
-          title: "Error",
-          description: "Failed to fetch weather data. Please check your API key.",
+          title: "Erro",
+          description: "Falha ao buscar dados do clima. Verifique sua chave de API.",
           variant: "destructive",
         });
       } finally {
@@ -149,7 +148,7 @@ const Index = () => {
 
   const handleCitySearch = useCallback(
     async (city: string) => {
-      if (!apiKeys) return;
+      if (!apiKeys.openWeather) return;
 
       setLoading(true);
       try {
@@ -158,17 +157,14 @@ const Index = () => {
         setLocation({ lat, lng: lon });
 
         const forecastData = await fetchForecast(lat, lon, apiKeys.openWeather);
-
-        setForecast(forecastData);
         setHistorical(generateHistoricalData(lat));
         
-        // Converter para o formato de 7 dias
         const sevenDayData = convertToForecastDay(forecastData);
         setSevenDayForecast(sevenDayData);
       } catch (error) {
         toast({
-          title: "City not found",
-          description: "Please try a different city name.",
+          title: "Cidade não encontrada",
+          description: "Tente um nome de cidade diferente.",
           variant: "destructive",
         });
       } finally {
@@ -181,8 +177,8 @@ const Index = () => {
   const handleUseCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       toast({
-        title: "Error",
-        description: "Geolocation is not supported by your browser.",
+        title: "Erro",
+        description: "Geolocalização não é suportada pelo seu navegador.",
         variant: "destructive",
       });
       return;
@@ -194,15 +190,14 @@ const Index = () => {
       },
       () => {
         toast({
-          title: "Error",
-          description: "Unable to get your location. Please allow location access.",
+          title: "Erro",
+          description: "Não foi possível obter sua localização. Permita o acesso à localização.",
           variant: "destructive",
         });
       }
     );
   }, [fetchWeatherData, toast]);
 
-  // Carregar localização atual ao iniciar
   useEffect(() => {
     handleUseCurrentLocation();
   }, []);
@@ -263,11 +258,11 @@ const Index = () => {
           <div className="lg:col-span-2 space-y-6">
             <CurrentWeather data={currentWeather} loading={loading} />
             
-            {/* Weekly Forecast - substituiu o ForecastChart */}
+            {/* Weekly Forecast */}
             <div className="p-6 bg-white dark:bg-gray-800 shadow-xl rounded-2xl">
               <div className="flex items-center gap-2 mb-6">
                 <Bookmark className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Weekly Forecast</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Previsão Semanal</h3>
               </div>
               <WeatherForecast forecast={sevenDayForecast} /> 
             </div>

@@ -26,6 +26,11 @@ const CurrentWeather = ({ data, loading }: CurrentWeatherProps) => {
     );
   }
 
+  // URL correta do OpenWeatherMap
+  const iconUrl = data.weather?.[0]?.icon 
+    ? `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`
+    : '';
+
   return (
     <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-xl">
       <div className="flex items-start justify-between mb-6">
@@ -42,11 +47,13 @@ const CurrentWeather = ({ data, loading }: CurrentWeatherProps) => {
             })}
           </p>
         </div>
-        <img
-          src={`https://openweathermap.org/img/wn/${data.weather?.[0]?.icon}@2x.png`}
-          alt={data.weather?.[0]?.description || 'Weather icon'}
-          className="w-20 h-20"
-        />
+        {iconUrl && (
+          <img
+            src={iconUrl}
+            alt={data.weather?.[0]?.description || 'Weather icon'}
+            className="w-20 h-20"
+          />
+        )}
       </div>
 
       <div className="flex items-end gap-2 mb-6">
